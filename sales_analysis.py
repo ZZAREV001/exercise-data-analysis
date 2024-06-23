@@ -1,6 +1,7 @@
 import io
-import requests
 import pandas as pd
+import matplotlib.pyplot as plt
+import requests
 
 
 def read_sales_data_from_s3(bucket_name, object_key):
@@ -28,12 +29,8 @@ def explore_data(df):
 
 def calculate_total_sales(df):
     """Calculates and prints the total sales amount."""
-    column_name = 'sales_amount'  # Use a variable for the column name
-    matching_columns = [col for col in df.columns if col.lower() == column_name.lower()]
-
-    if matching_columns:
-        # Use the first matching column if there are multiple
-        df = df.rename(columns={matching_columns[0]: column_name})
+    column_name = 'week'  # Use a variable for the column name
+    if column_name in df.columns:
         total_sales = df[column_name].sum()
         print(f"\nTotal sales: ${total_sales:,.2f}")
     else:
@@ -42,23 +39,91 @@ def calculate_total_sales(df):
 
 def analyze_sales_by_category(df):
     """Calculates and prints sales grouped by category."""
-    amount_column_name = 'sales_amount'  # Use a variable for the sales amount column name
-    category_column_name = 'category'  # Use a variable for the category column name
+    amount_column_name = 'sales_method'
+    category_column_name = 'customer_id'
 
-    # Case-insensitive search for both columns
-    matching_amount_columns = [col for col in df.columns if col.lower() == amount_column_name.lower()]
-    matching_category_columns = [col for col in df.columns if col.lower() == category_column_name.lower()]
-
-    if matching_amount_columns and matching_category_columns:
-        # Use the first matching column for each if there are multiple
-        df = df.rename(columns={
-            matching_amount_columns[0]: amount_column_name,
-            matching_category_columns[0]: category_column_name
-        })
-
+    if amount_column_name in df.columns and category_column_name in df.columns:
         sales_by_category = df.groupby(category_column_name)[amount_column_name].sum()
         print("\nSales by category:")
         print(sales_by_category.to_markdown(numalign='left', stralign='left'))
     else:
         print(f"Either column '{amount_column_name}' or '{category_column_name}' not found in the data.")
 
+
+def analyze_revenue_over_time(df):
+    """Analyzes and plots revenue trends over time using the 'week' column."""
+
+    # Check if 'week' and 'revenue' columns exist
+    if 'week' in df.columns and 'revenue' in df.columns:
+        # Aggregate revenue by week and calculate cumulative revenue
+        weekly_revenue = df.groupby('week')['revenue'].sum().reset_index()
+        weekly_revenue['cumulative_revenue'] = weekly_revenue['revenue'].cumsum()
+
+        # Create the plot
+        plt.figure(figsize=(12, 6))
+        plt.plot(weekly_revenue['week'], weekly_revenue['revenue'], marker='o', linestyle='-')  # Line plot
+        plt.plot(weekly_revenue['week'], weekly_revenue['cumulative_revenue'], marker='x',
+                 linestyle='--')  # Added cumulative line
+
+        # Add labels and title
+        plt.title('Revenue Trend Over Time')
+        plt.xlabel('Week Since Product Launch')
+        plt.ylabel('Revenue')
+        plt.grid(axis='y')  # Add a grid to the y-axis
+        plt.legend(['Weekly Revenue', 'Cumulative Revenue'])  # Added legend for two lines
+
+        # Show the plot
+        plt.show()
+    else:
+        print(f"Either column 'week' or 'revenue' not found in the data.")
+
+
+def calculate_descriptive_statistics(df):
+    """Calculates and prints descriptive statistics for numerical columns."""
+    numeric_columns = df.select_dtypes(include=['int64', 'float64']).columns
+    if not numeric_columns.empty:
+        stats = df[numeric_columns].describe()
+        print("\nDescriptive Statistics:")
+        print(stats.to_markdown(numalign='left', stralign='left'))
+    else:
+        print("No numeric columns found in the data.")
+
+
+def identify_top_products(df, n=10):
+    """Identifies and prints the top N products by sales amount."""
+    product_column = 'sales_method'
+    amount_column = 'revenue'
+
+    if product_column in df.columns and amount_column in df.columns:
+        top_products = df.groupby(product_column)[amount_column].sum().nlargest(n)
+        print(f"\nTop {n} Products by Sales Amount:")
+        print(top_products.to_markdown(numalign='left', stralign='left'))
+    else:
+        print(f"Either '{product_column}' or '{amount_column}' column not found in the data.")
+
+
+def visualize_category_distribution(df):
+    """Creates a pie chart to visualize the distribution of sales across categories."""
+    category_column = 'sales_method'
+    amount_column = 'revenue'
+
+    if category_column in df.columns and amount_column in df.columns:
+        category_sales = df.groupby(category_column)[amount_column].sum()
+        plt.figure(figsize=(10, 8))
+        plt.pie(category_sales, labels=category_sales.index, autopct='%1.1f%%', startangle=90)
+        plt.title('Sales Distribution by Category')
+        plt.axis('equal')
+        plt.show()
+    else:
+        print(f"Either '{category_column}' or '{amount_column}' column not found in the data.")
+
+
+def generate_report(df):
+    """Generates a comprehensive report by calling all analysis functions."""
+    explore_data(df)
+    calculate_total_sales(df)
+    analyze_sales_by_category(df)
+    analyze_revenue_over_time(df)
+    calculate_descriptive_statistics(df)
+    identify_top_products(df)
+    visualize_category_distribution(df)
