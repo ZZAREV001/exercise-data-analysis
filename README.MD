@@ -1,6 +1,6 @@
 The command-line terminal is used to run the data
 analysis progressively:
-python main.py --analysis_type 1
+python main.py --analysis_type 'number of the analysis we want'
 
 1. Explore the data:
 python main.py --analysis_type 1
