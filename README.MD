@@ -24,8 +24,17 @@ python main.py --analysis_type 6 --top_n 5
 7. Visualize Category Distribution:
 python main.py --analysis_type 7
 
-8. Generate Full Report:
+8. Visualize the sales volume profile:
 python main.py --analysis_type 8
 
-9. Exit the program:
+9. Analyze the revenue distribution:
 python main.py --analysis_type 9
+
+10. Predict the most effective sales method:
+python main.py --analysis_type 10
+
+11. Generate a report:
+python main.py --analysis_type 11
+
+12. Exit the program:
+python main.py --analysis_type 12

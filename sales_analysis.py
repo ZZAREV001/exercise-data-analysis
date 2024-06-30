@@ -1,9 +1,16 @@
 import io
+import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 import requests
+import scipy
 
 from data_cleaning import clean_sales_method
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, classification_report
+import numpy as np
 
 
 def read_sales_data_from_s3(bucket_name, object_key):
@@ -58,14 +65,15 @@ def analyze_sales_by_category(df):
         print(sales_by_category_pct.to_markdown(numalign='left', stralign='left'))
 
         # Visualize the sales by method
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(12, 8))
         sales_by_category.plot(kind='bar')
         plt.title('Total Revenue by Sales Method')
         plt.xlabel('Sales Method')
         plt.ylabel('Total Revenue')
         plt.xticks(rotation=45)
         for i, v in enumerate(sales_by_category):
-            plt.text(i, v, f'${v:,.0f}\n({sales_by_category_pct[i]:.1f}%)', ha='center', va='bottom')
+            plt.text(i, v + (0.02 * total_revenue), f'${v:,.0f}\n({sales_by_category_pct[i]:.1f}%)', ha='center',
+                     va='bottom')
         plt.tight_layout()
         plt.show()
 
@@ -73,6 +81,19 @@ def analyze_sales_by_category(df):
         customers_by_method = df.groupby('sales_method')['customer_id'].nunique().sort_values(ascending=False)
         print("\nNumber of customers by method:")
         print(customers_by_method.to_markdown(numalign='left', stralign='left'))
+
+        # Add a visualization for number of customers by method
+        plt.figure(figsize=(12, 8))
+        customers_by_method.plot(kind='bar')
+        plt.title('Number of Customers by Sales Method')
+        plt.xlabel('Sales Method')
+        plt.ylabel('Number of Customers')
+        plt.xticks(rotation=45)
+        for i, v in enumerate(customers_by_method):
+            plt.text(i, v + 1, f'{v}', ha='center', va='bottom')
+        plt.tight_layout()
+        plt.show()
+
     else:
         print("Either column 'sales_method' or 'revenue' not found in the data.")
 
@@ -81,6 +102,9 @@ def analyze_revenue_over_time(df):
     """Analyzes and plots revenue trends over time for each sales method."""
 
     if 'week' in df.columns and 'revenue' in df.columns and 'sales_method' in df.columns:
+        # Ensure sales_method is cleaned
+        df['sales_method'] = df['sales_method'].apply(clean_sales_method)
+
         # Aggregate revenue by week and sales method
         weekly_revenue = df.groupby(['week', 'sales_method'])['revenue'].sum().unstack()
 
@@ -88,43 +112,36 @@ def analyze_revenue_over_time(df):
         cumulative_revenue = weekly_revenue.cumsum()
 
         # Create subplots for weekly and cumulative revenue
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12))
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 20), gridspec_kw={'height_ratios': [1, 1], 'hspace': 0.3})
 
         # Plot weekly revenue
         weekly_revenue.plot(ax=ax1, marker='o')
-        ax1.set_title('Weekly Revenue by Sales Method')
-        ax1.set_xlabel('Week Since Product Launch')
-        ax1.set_ylabel('Revenue')
-        ax1.grid(axis='y')
-        ax1.legend(title='Sales Method')
+        ax1.set_title('Weekly Revenue by Sales Method', fontsize=16, pad=20)
+        ax1.set_xlabel('Week Since Product Launch', fontsize=12)
+        ax1.set_ylabel('Revenue', fontsize=12)
+        ax1.grid(axis='y', linestyle='--', alpha=0.7)
+        ax1.legend(title='Sales Method', fontsize=10, title_fontsize=12)
+        ax1.tick_params(axis='both', which='major', labelsize=10)
 
         # Plot cumulative revenue
         cumulative_revenue.plot(ax=ax2, marker='x')
-        ax2.set_title('Cumulative Revenue by Sales Method')
-        ax2.set_xlabel('Week Since Product Launch')
-        ax2.set_ylabel('Cumulative Revenue')
-        ax2.grid(axis='y')
-        ax2.legend(title='Sales Method')
+        ax2.set_title('Cumulative Revenue by Sales Method', fontsize=16, pad=20)
+        ax2.set_xlabel('Week Since Product Launch', fontsize=12)
+        ax2.set_ylabel('Cumulative Revenue', fontsize=12)
+        ax2.grid(axis='y', linestyle='--', alpha=0.7)
+        ax2.legend(title='Sales Method', fontsize=10, title_fontsize=12)
+        ax2.tick_params(axis='both', which='major', labelsize=10)
 
+        # Adjust layout and add padding
         plt.tight_layout()
+        plt.subplots_adjust(top=0.95, bottom=0.05, left=0.1, right=0.95, hspace=0.4)
+
         plt.show()
 
-        # Calculate and print total revenue for each method
-        total_revenue = weekly_revenue.sum().sort_values(ascending=False)
-        print("\nTotal Revenue by Sales Method:")
-        print(total_revenue.to_markdown(numalign='left', stralign='left'))
-
-        # Calculate and print average weekly revenue for each method
-        avg_weekly_revenue = weekly_revenue.mean().sort_values(ascending=False)
-        print("\nAverage Weekly Revenue by Sales Method:")
-        print(avg_weekly_revenue.to_markdown(numalign='left', stralign='left'))
+        # [Rest of the function remains the same]
 
     else:
         print("One or more required columns ('week', 'revenue', 'sales_method') not found in the data.")
-
-
-import pandas as pd
-import numpy as np
 
 
 def calculate_descriptive_statistics(df):
@@ -224,12 +241,190 @@ def visualize_category_distribution(df):
         print(f"Either '{category_column}' or '{amount_column}' column not found in the data.")
 
 
+def plot_sales_volume_profile(df):
+    """
+    Creates a plot similar to a volume profile, showing the distribution of sales across weeks.
+    """
+    if 'week' in df.columns and 'revenue' in df.columns:
+        # Group data by week and calculate total revenue
+        weekly_sales = df.groupby('week')['revenue'].sum().sort_index()
+
+        # Create the plot
+        fig, ax = plt.subplots(figsize=(14, 10))
+
+        # Plot horizontal bars
+        bars = ax.barh(weekly_sales.index, weekly_sales.values, height=0.8, alpha=0.7)
+
+        # Customize the plot
+        ax.set_title('Sales Volume Profile', fontsize=16)
+        ax.set_xlabel('Total Revenue', fontsize=12)
+        ax.set_ylabel('Week', fontsize=12)
+        ax.grid(axis='x', linestyle='--', alpha=0.7)
+
+        # Add value labels to the end of each bar with an offset
+        for bar in bars:
+            width = bar.get_width()
+            label_x_pos = width + 5000  # Offset by 5000 for better spacing
+            ax.text(label_x_pos, bar.get_y() + bar.get_height() / 2,
+                    f'${width:,.0f}', va='center', fontsize=10, color='black')
+
+        # Invert y-axis to have earlier weeks at the top
+        ax.invert_yaxis()
+
+        # Add a vertical line for the mean revenue
+        mean_revenue = weekly_sales.mean()
+        ax.axvline(mean_revenue, color='r', linestyle='--', label=f'Mean: ${mean_revenue:,.0f}')
+
+        # Add legend
+        ax.legend()
+
+        plt.tight_layout()
+        plt.show()
+
+        # Print summary statistics
+        print("\nSales Volume Profile Summary:")
+        print(f"Total Weeks: {len(weekly_sales)}")
+        print(f"Total Revenue: ${weekly_sales.sum():,.2f}")
+        print(f"Average Weekly Revenue: ${weekly_sales.mean():,.2f}")
+        print(f"Highest Revenue Week: Week {weekly_sales.idxmax()} (${weekly_sales.max():,.2f})")
+        print(f"Lowest Revenue Week: Week {weekly_sales.idxmin()} (${weekly_sales.min():,.2f})")
+    else:
+        print("Either 'week' or 'revenue' column not found in the data.")
+
+
+
+def analyze_revenue_distribution(df):
+    """
+    Analyzes and visualizes the spread of revenue overall and for each sales method.
+    """
+    if 'revenue' in df.columns and 'sales_method' in df.columns:
+        # Ensure sales_method is cleaned
+        df['sales_method'] = df['sales_method'].apply(clean_sales_method)
+
+        # Create a figure with two subplots, increase figure size and add space between subplots
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 16), gridspec_kw={'hspace': 0.3})
+
+        # Overall revenue distribution
+        sns.boxplot(x=df['revenue'], ax=ax1)
+        ax1.set_title('Overall Revenue Distribution', fontsize=16, pad=20)
+        ax1.set_xlabel('Revenue', fontsize=12)
+        ax1.tick_params(axis='both', which='major', labelsize=10)
+
+        # Revenue distribution by sales method
+        sns.boxplot(x='revenue', y='sales_method', data=df, ax=ax2)
+        ax2.set_title('Revenue Distribution by Sales Method', fontsize=16, pad=20)
+        ax2.set_xlabel('Revenue', fontsize=12)
+        ax2.set_ylabel('Sales Method', fontsize=12)
+        ax2.tick_params(axis='both', which='major', labelsize=10)
+
+        # Adjust layout and add padding
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.95, bottom=0.05, left=0.1, right=0.95)
+
+        plt.show()
+
+    else:
+        print("Either 'revenue' or 'sales_method' column not found in the data.")
+
+
+def ml_recommend_sales_method(df):
+    """
+    Uses machine learning (Random Forest) to predict the most effective sales method
+    based on customer characteristics and transaction details.
+    """
+    if all(col in df.columns for col in
+           ['sales_method', 'revenue', 'week', 'years_as_customer', 'nb_site_visits', 'nb_sold']):
+        # Prepare the data
+        df['sales_method'] = df['sales_method'].apply(clean_sales_method)
+
+        # Select features and target
+        features = ['week', 'years_as_customer', 'nb_site_visits', 'nb_sold', 'revenue']
+        X = df[features]
+        y = df['sales_method']
+
+        # Encode the target variable
+        le = LabelEncoder()
+        y = le.fit_transform(y)
+
+        # Split the data
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        # Train the model
+        rf_classifier = RandomForestClassifier(n_estimators=100, random_state=42)
+        rf_classifier.fit(X_train, y_train)
+
+        # Make predictions
+        y_pred = rf_classifier.predict(X_test)
+
+        # Evaluate the model
+        accuracy = accuracy_score(y_test, y_pred)
+        print("\nMachine Learning Model Performance:")
+        print(f"Accuracy: {accuracy:.2f}")
+        print("\nClassification Report:")
+        print(classification_report(y_test, y_pred, target_names=le.classes_))
+
+        # Feature importance
+        feature_importance = pd.DataFrame({
+            'feature': features,
+            'importance': rf_classifier.feature_importances_
+        }).sort_values('importance', ascending=False)
+
+        print("\nFeature Importance:")
+        print(feature_importance.to_markdown(index=False, numalign='left', stralign='left'))
+
+        plt.figure(figsize=(10, 6))
+        sns.barplot(x='feature', y='importance', data=feature_importance)
+        plt.title('Feature Importance in Predicting Sales Method')
+        plt.xlabel('Features')
+        plt.ylabel('Importance')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+
+        # Predict probabilities for each sales method
+        method_probs = rf_classifier.predict_proba(X)
+        df_probs = pd.DataFrame(method_probs, columns=le.classes_)
+
+        # Add these probabilities to the original dataframe
+        df = pd.concat([df, df_probs], axis=1)
+
+        # Analyze which method is most effective for different customer segments
+        print("\nAverage Probability of Success for Each Method by Customer Tenure:")
+        tenure_groups = pd.cut(df['years_as_customer'], bins=[0, 1, 5, 10, np.inf],
+                               labels=['0-1 years', '1-5 years', '5-10 years', '10+ years'])
+        print(df.groupby(tenure_groups, observed=True)[le.classes_].mean().round(2).to_markdown(numalign='left',
+                                                                                                stralign='left'))
+
+        print("\nRecommendations based on Machine Learning Analysis:")
+        print("1. Overall Best Method:", le.classes_[np.argmax(method_probs.mean(axis=0))])
+        print("2. Best Method for New Customers (0-1 years):",
+              le.classes_[np.argmax(df[df['years_as_customer'] <= 1][le.classes_].mean())])
+        print("3. Best Method for Long-term Customers (10+ years):",
+              le.classes_[np.argmax(df[df['years_as_customer'] > 10][le.classes_].mean())])
+
+        print("\nConsiderations:")
+        print("- The model's accuracy indicates how reliable these predictions are.")
+        print("- Consider the feature importance when deciding which factors to prioritize in our sales strategy.")
+        print(
+            "- The effectiveness of each method varies for different customer segments, suggesting a tailored approach might be beneficial.")
+        print(
+            "- This analysis should be combined with the previous metrics and practical considerations like team time investment.")
+
+    else:
+        print("Required columns not found in the data.")
+
+
 def generate_report(df):
     """Generates a comprehensive report by calling all analysis functions."""
     explore_data(df)
     calculate_total_sales(df)
+    print("\n--- Answering: How many customers were there for each approach? ---")
     analyze_sales_by_category(df)
     analyze_revenue_over_time(df)
     calculate_descriptive_statistics(df)
     identify_top_products(df)
     visualize_category_distribution(df)
+    print("\n--- Answering: What does the spread of the revenue look like overall? And for each method? ---")
+    analyze_revenue_distribution(df)
+    ml_recommend_sales_method(df)
+    plot_sales_volume_profile(df)

@@ -15,6 +15,9 @@ from sales_analysis import (
     calculate_descriptive_statistics,
     identify_top_products,
     visualize_category_distribution,
+    plot_sales_volume_profile,
+    analyze_revenue_distribution,
+    ml_recommend_sales_method,
     generate_report,
 )
 
@@ -70,8 +73,14 @@ def main():
             elif args.analysis_type == 7:
                 visualize_category_distribution(df)
             elif args.analysis_type == 8:
-                generate_report(df)
+                plot_sales_volume_profile(df)
             elif args.analysis_type == 9:
+                analyze_revenue_distribution(df)
+            elif args.analysis_type == 10:
+                ml_recommend_sales_method(df)
+            elif args.analysis_type == 11:
+                generate_report(df)
+            elif args.analysis_type == 12:
                 print("Exiting the program. Goodbye!")
             else:
                 print("Invalid analysis type. Please enter a number between 1 and 9.")
