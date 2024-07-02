@@ -3,7 +3,7 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 import requests
-import scipy
+from typing import Optional, Tuple
 
 from data_cleaning import clean_sales_method
 from sklearn.ensemble import RandomForestClassifier
@@ -13,8 +13,42 @@ from sklearn.metrics import accuracy_score, classification_report
 import numpy as np
 
 
-def read_sales_data_from_s3(bucket_name, object_key):
-    """Reads sales data from a public S3 bucket into a Pandas DataFrame."""
+def validate_data_types(df: pd.DataFrame) -> dict:
+    """
+    Validates the data types of each column in the DataFrame.
+    Returns a dictionary of column names and their validation status.
+    """
+    expected_types = {
+        'week': 'int64',
+        'sales_method': 'object',
+        'customer_id': 'object',
+        'nb_sold': 'int64',
+        'revenue': 'float64',
+        'years_as_customer': 'int64',
+        'nb_site_visits': 'int64',
+        'state': 'object'
+    }
+
+    validation_results = {}
+
+    for column, expected_type in expected_types.items():
+        if column in df.columns:
+            is_valid = df[column].dtype == expected_type
+            validation_results[column] = is_valid
+            if not is_valid:
+                print(f"Warning: Column '{column}' has type {df[column].dtype}, expected {expected_type}")
+        else:
+            validation_results[column] = False
+            print(f"Warning: Column '{column}' is missing from the DataFrame")
+
+    return validation_results
+
+
+def read_sales_data_from_s3(bucket_name: str, object_key: str) -> Tuple[Optional[pd.DataFrame], dict]:
+    """
+    Reads sales data from a public S3 bucket into a Pandas DataFrame and validates its structure.
+    Returns a tuple containing the DataFrame (or None if an error occurred) and the validation results.
+    """
     url = f"https://{bucket_name}.s3.amazonaws.com/{object_key}"
     try:
         response = requests.get(url, verify=False)  # Temporarily disable SSL verification
@@ -23,10 +57,19 @@ def read_sales_data_from_s3(bucket_name, object_key):
         # Wrap response content in a file-like object
         with io.StringIO(response.content.decode('utf-8')) as f:
             df = pd.read_csv(f)
-        return df
+
+        # Validate the data types
+        validation_results = validate_data_types(df)
+
+        if all(validation_results.values()):
+            print("All columns present and have correct types.")
+        else:
+            print("Some columns are missing or have incorrect types. Data may need cleaning or further investigation.")
+
+        return df, validation_results
     except requests.exceptions.RequestException as e:
         print(f"Error downloading file from S3: {e}")
-        return None
+        return None, {}
 
 
 def explore_data(df):
@@ -290,7 +333,6 @@ def plot_sales_volume_profile(df):
         print(f"Lowest Revenue Week: Week {weekly_sales.idxmin()} (${weekly_sales.min():,.2f})")
     else:
         print("Either 'week' or 'revenue' column not found in the data.")
-
 
 
 def analyze_revenue_distribution(df):

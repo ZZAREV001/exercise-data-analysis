@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 
 def clean_date_column(df, column_name='date'):
@@ -58,9 +59,94 @@ def handle_missing_values(df):
     return df
 
 
+def validate_data_types(df: pd.DataFrame) -> dict:
+    """
+    Validates the data types of each column in the DataFrame.
+    Returns a dictionary of column names and their validation status.
+    """
+    expected_types = {
+        'week': [np.int64, np.int32],
+        'sales_method': [object, pd.StringDtype()],
+        'customer_id': [object, pd.StringDtype()],
+        'nb_sold': [np.int64, np.int32],
+        'revenue': [np.float64, np.float32],
+        'years_as_customer': [np.int64, np.int32],
+        'nb_site_visits': [np.int64, np.int32],
+        'state': [object, pd.StringDtype()]
+    }
+
+    validation_results = {}
+
+    for column, expected_type_list in expected_types.items():
+        if column in df.columns:
+            is_valid = type(df[column].dtype) in expected_type_list or df[column].dtype in expected_type_list
+            validation_results[column] = is_valid
+            if not is_valid:
+                print(f"Warning: Column '{column}' has type {df[column].dtype}, expected one of {expected_type_list}")
+        else:
+            validation_results[column] = False
+            print(f"Warning: Column '{column}' is missing from the DataFrame")
+
+    return validation_results
+
+
+def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans the data in the DataFrame.
+    """
+    # Week column
+    df['week'] = pd.to_numeric(df['week'], errors='coerce')
+    df = df[df['week'].notnull() & (df['week'] >= 0)]
+    print("Cleaned 'week' column.")
+
+    # Sales method column
+    df['sales_method'] = df['sales_method'].apply(clean_sales_method)
+    df = df[df['sales_method'] != 'unknown']
+    print("Cleaned 'sales_method' column.")
+
+    # Customer ID column
+    df['customer_id'] = df['customer_id'].astype(str).str.strip()
+    df = df[df['customer_id'] != '']
+    print("Cleaned 'customer_id' column.")
+
+    # Number of products sold column
+    df['nb_sold'] = pd.to_numeric(df['nb_sold'], errors='coerce')
+    df = df[df['nb_sold'].notnull() & (df['nb_sold'] >= 0)]
+    print("Cleaned 'nb_sold' column.")
+
+    # Revenue column
+    df['revenue'] = pd.to_numeric(df['revenue'].replace('[\$,]', '', regex=True), errors='coerce')
+    df = df[df['revenue'].notnull() & (df['revenue'] >= 0)]
+    df['revenue'] = df['revenue'].round(2)
+    print("Cleaned 'revenue' column.")
+
+    # Years as customer column
+    df['years_as_customer'] = pd.to_numeric(df['years_as_customer'], errors='coerce')
+    max_years = datetime.now().year - 1984  # Company founded in 1984
+    df = df[df['years_as_customer'].notnull() & (df['years_as_customer'] >= 0) & (df['years_as_customer'] <= max_years)]
+    print("Cleaned 'years_as_customer' column.")
+
+    # Number of site visits column
+    df['nb_site_visits'] = pd.to_numeric(df['nb_site_visits'], errors='coerce')
+    df = df[df['nb_site_visits'].notnull() & (df['nb_site_visits'] >= 0)]
+    print("Cleaned 'nb_site_visits' column.")
+
+    # State column
+    df['state'] = df['state'].str.strip().str.upper()
+    print("Cleaned 'state' column.")
+
+    # Remove duplicates
+    original_rows = len(df)
+    df = df.drop_duplicates()
+    removed_rows = original_rows - len(df)
+    print(f"Removed {removed_rows} duplicate rows.")
+
+    return df
+
+
 def clean_sales_method(method):
     """Standardize sales method names"""
-    method = method.lower().strip()
+    method = str(method).lower().strip()
     if method in ['em + call', 'email + call']:
         return 'email + call'
     elif method in ['email', 'em']:
@@ -68,55 +154,7 @@ def clean_sales_method(method):
     elif method == 'call':
         return 'call'
     else:
-        return 'unknown'  # Handle any unexpected values
-
-
-def clean_data(df):
-    # Clean date column
-    if 'date' in df.columns:
-        df = clean_date_column(df, 'date')
-    else:
-        print("Skipping cleaning 'date' column as it does not exist in the DataFrame.")
-
-    # Clean numeric columns
-    numeric_columns = ['revenue', 'nb_sold', 'years_as_customer', 'nb_site_visits']
-    for col in numeric_columns:
-        if col in df.columns:
-            df = clean_numeric_column(df, col)
-        else:
-            print(f"Skipping cleaning '{col}' column as it does not exist in the DataFrame.")
-
-    # Clean sales method column
-    if 'sales_method' in df.columns:
-        df['sales_method'] = df['sales_method'].apply(clean_sales_method)
-        print("Cleaned 'sales_method' column.")
-    else:
-        print("Skipping cleaning 'sales_method' column as it does not exist in the DataFrame.")
-
-    # Clean state column
-    if 'state' in df.columns:
-        df['state'] = df['state'].str.strip().str.upper()
-        print("Cleaned 'state' column.")
-    else:
-        print("Skipping cleaning 'state' column as it does not exist in the DataFrame.")
-
-    # Remove duplicates
-    original_rows = len(df)
-    df = remove_duplicates(df)
-    removed_rows = original_rows - len(df)
-    print(f"Removed {removed_rows} duplicate rows.")
-
-    # Handle missing values
-    df = handle_missing_values(df)
-    print("Handled missing values.")
-
-    # Remove rows with 'unknown' sales method
-    unknown_rows = df[df['sales_method'] == 'unknown']
-    if not unknown_rows.empty:
-        print(f"Removing {len(unknown_rows)} rows with unknown sales method.")
-        df = df[df['sales_method'] != 'unknown']
-
-    return df
+        return 'unknown'
 
 
 # Printing the summary of the cleaning process
