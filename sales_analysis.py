@@ -109,14 +109,18 @@ def analyze_sales_by_category(df):
 
         # Visualize the sales by method
         plt.figure(figsize=(12, 8))
-        sales_by_category.plot(kind='bar')
+        bars = sales_by_category.plot(kind='bar')
         plt.title('Total Revenue by Sales Method')
         plt.xlabel('Sales Method')
         plt.ylabel('Total Revenue')
         plt.xticks(rotation=45)
+
+        # Set y-limits to accommodate text labels
+        plt.ylim(0, max(sales_by_category) * 1.2)
+
         for i, v in enumerate(sales_by_category):
-            plt.text(i, v + (0.02 * total_revenue), f'${v:,.0f}\n({sales_by_category_pct[i]:.1f}%)', ha='center',
-                     va='bottom')
+            plt.text(i, v + (0.05 * total_revenue), f'${v:,.0f}\n({sales_by_category_pct[i]:.1f}%)', ha='center',
+                     va='bottom', fontsize=10)
         plt.tight_layout()
         plt.show()
 
@@ -132,8 +136,12 @@ def analyze_sales_by_category(df):
         plt.xlabel('Sales Method')
         plt.ylabel('Number of Customers')
         plt.xticks(rotation=45)
+
+        # Set y-limits to accommodate text labels
+        plt.ylim(0, max(customers_by_method) * 1.2)
+
         for i, v in enumerate(customers_by_method):
-            plt.text(i, v + 1, f'{v}', ha='center', va='bottom')
+            plt.text(i, v + (0.05 * max(customers_by_method)), f'{v}', ha='center', va='bottom', fontsize=10)
         plt.tight_layout()
         plt.show()
 
