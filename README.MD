@@ -33,8 +33,11 @@ python main.py --analysis_type 9
 10. Predict the most effective sales method:
 python main.py --analysis_type 10
 
-11. Generate a report:
+11. Business metric: Calculates the Revenue per Customer metric for each sales method over time.
 python main.py --analysis_type 11
 
-12. Exit the program:
+12. Generate a report:
 python main.py --analysis_type 12
+
+13. Exit the program:
+python main.py --analysis_type 13

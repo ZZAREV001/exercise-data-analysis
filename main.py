@@ -13,6 +13,7 @@ from sales_analysis import (
     plot_sales_volume_profile,
     analyze_revenue_distribution,
     ml_recommend_sales_method,
+    calculate_revenue_per_customer,
     generate_report,
 )
 
@@ -91,6 +92,8 @@ def main():
             elif args.analysis_type == 10:
                 ml_recommend_sales_method(df)
             elif args.analysis_type == 11:
+                calculate_revenue_per_customer(df)
+            elif args.analysis_type == 12:
                 generate_report(df)
             else:
                 print("Invalid analysis type. Please enter a number between 1 and 11.")

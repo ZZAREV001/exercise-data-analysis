@@ -464,6 +464,52 @@ def ml_recommend_sales_method(df):
         print("Required columns not found in the data.")
 
 
+def calculate_revenue_per_customer(df):
+    """
+    Calculates the Revenue per Customer metric for each sales method over time.
+    Args:
+    df (pandas.DataFrame): The sales data DataFrame
+    Returns:
+    pandas.DataFrame: A DataFrame with Revenue per Customer for each sales method and week
+    """
+    # Ensure sales_method is cleaned
+    df['sales_method'] = df['sales_method'].apply(clean_sales_method)
+
+    # Group by week and sales method
+    grouped = df.groupby(['week', 'sales_method'])
+
+    # Calculate total revenue and number of unique customers for each group
+    revenue = grouped['revenue'].sum()
+    customers = grouped['customer_id'].nunique()
+
+    # Calculate revenue per customer
+    revenue_per_customer = revenue / customers
+
+    # Reshape the data for easier plotting
+    revenue_per_customer = revenue_per_customer.unstack()
+
+    # Plot the results
+    plt.figure(figsize=(12, 6))
+    revenue_per_customer.plot(marker='o')
+    plt.title('Revenue per Customer by Sales Method Over Time')
+    plt.xlabel('Week')
+    plt.ylabel('Revenue per Customer ($)')
+    plt.legend(title='Sales Method')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.show()
+
+    # Print summary statistics
+    print("\nRevenue per Customer Summary:")
+    print(revenue_per_customer.describe().to_markdown(numalign='left', stralign='left'))
+
+    # Calculate overall average for each method
+    overall_average = revenue_per_customer.mean()
+    print("\nOverall Average Revenue per Customer by Sales Method:")
+    print(overall_average.to_markdown(numalign='left', stralign='left'))
+
+    return revenue_per_customer
+
 def generate_report(df):
     """Generates a comprehensive report by calling all analysis functions."""
     explore_data(df)
@@ -478,3 +524,5 @@ def generate_report(df):
     analyze_revenue_distribution(df)
     ml_recommend_sales_method(df)
     plot_sales_volume_profile(df)
+    print("\n--- Analyzing Revenue per Customer Metric ---")
+    calculate_revenue_per_customer(df)
